@@ -1,7 +1,6 @@
 import pandas as pd
 import os
 
-# Lê o arquivo tratado (com codificação UTF-8)
 df = pd.read_csv("vendas_restaurante_tratado.csv", encoding='utf-8')
 
 # Converte a coluna de data para datetime
@@ -17,7 +16,6 @@ for (ano, mes), grupo in df.groupby(['ano', 'mes']):
     os.makedirs(pasta, exist_ok=True)
     arquivo = f"{pasta}/vendas_{ano}_{mes:02d}.csv"
     
-    # Salva com codificação compatível com Excel
     grupo.to_csv(arquivo, index=False, encoding='utf-8-sig')
     
     print(f"✅ Arquivo salvo em: {arquivo}")
