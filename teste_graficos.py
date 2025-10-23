@@ -140,9 +140,13 @@ def plot_avaliacoes(df_):
 
 
 def plot_pizzas(df_):
+    # Filtra apenas as linhas onde o cardápio tem 'pizza'
     pizzas = df_[df_["tipo_cardapio"].str.contains("pizza", case=False, na=False)]
+    
     if len(pizzas) > 0:
-        pizza_counts = pizzas["pizza"].value_counts().head(5)
+        # O sabor da pizza está na coluna 'prato'
+        pizza_counts = pizzas["prato"].value_counts().head(5)
+        
         col1, col2 = st.columns(2)
         with col1:
             fig, ax = plt.subplots(figsize=(6, 4))
@@ -151,14 +155,22 @@ def plot_pizzas(df_):
             ax.set_xlabel("Quantidade")
             ax.set_ylabel("Sabores")
             st.pyplot(fig)
+        
         with col2:
             pizza_percent = (pizza_counts / pizza_counts.sum()) * 100
             fig, ax = plt.subplots(figsize=(5, 5))
-            ax.pie(pizza_percent, labels=pizza_percent.index, autopct='%1.1f%%', startangle=90, colors=sns.color_palette("pastel"))
+            ax.pie(
+                pizza_percent,
+                labels=pizza_percent.index,
+                autopct='%1.1f%%',
+                startangle=90,
+                colors=sns.color_palette("pastel")
+            )
             ax.set_title("Porcentagem de Vendas por Sabor (Top 5)")
             st.pyplot(fig)
     else:
         st.info("Nenhuma venda de pizza para o filtro selecionado.")
+
 
 
 def plot_bebidas(df_):
