@@ -86,8 +86,10 @@ def gerar_vendas(inicio='2023-06-30', fim='2025-06-30'):
 
             # 🥤 Bebida (90%)
             bebida = "Nenhuma"
+            tipo_bebida = "Nenhuma"
             if random.random() < 0.9:
-                tipo = random.choices(["Lata", "2L", "Suco", "Água"], weights=[50, 10, 30, 10])[0]
+                tipo = random.choices(["Lata", "2L", "Suco", "Água", "Refil"], weights=[45, 8, 25, 10, 12])[0]
+                tipo_bebida = tipo
                 if tipo == "Lata":
                     bebida = random.choices(bebidas_lata, weights=pesos_lata)[0]
                     valor += 6
@@ -97,6 +99,9 @@ def gerar_vendas(inicio='2023-06-30', fim='2025-06-30'):
                 elif tipo == "Suco":
                     bebida = random.choices(sucos, weights=pesos_suco)[0]
                     valor += 8
+                elif tipo == "Refil":
+                    bebida = "Refil de Refrigerante"
+                    valor += 12.90
                 else:
                     bebida = "Água"
                     valor += 4
@@ -122,6 +127,7 @@ def gerar_vendas(inicio='2023-06-30', fim='2025-06-30'):
                 'tipo_cardapio': 'Prato Executivo',
                 'prato': prato_nome,
                 'sobremesa': sobremesa_nome,
+                'tipo_bebida': tipo_bebida,
                 'bebida': bebida,
                 'valor_total': round(valor, 2),
                 'forma_pagamento': forma_pgto,
@@ -145,8 +151,10 @@ def gerar_vendas(inicio='2023-06-30', fim='2025-06-30'):
 
             # 🥤 Bebida (85%)
             bebida = "Nenhuma"
+            tipo_bebida = "Nenhuma"
             if random.random() < 0.85:
-                tipo = random.choices(["Lata", "2L", "Suco", "Água"], weights=[60, 15, 20, 5])[0]
+                tipo = random.choices(["Lata", "2L", "Suco", "Água", "Refil"], weights=[50, 15, 20, 5, 10])[0]
+                tipo_bebida = tipo
                 if tipo == "Lata":
                     bebida = random.choices(bebidas_lata, weights=pesos_lata)[0]
                     valor += 6
@@ -156,6 +164,9 @@ def gerar_vendas(inicio='2023-06-30', fim='2025-06-30'):
                 elif tipo == "Suco":
                     bebida = random.choices(sucos, weights=pesos_suco)[0]
                     valor += 8
+                elif tipo == "Refil":
+                    bebida = "Refil de Refrigerante"
+                    valor += 12.90
                 else:
                     bebida = "Água"
                     valor += 4
@@ -189,6 +200,7 @@ def gerar_vendas(inicio='2023-06-30', fim='2025-06-30'):
                 'tipo_cardapio': 'Pizza à la carte',
                 'prato': pizza_nome,
                 'sobremesa': sobremesa_nome,
+                'tipo_bebida': tipo_bebida,
                 'bebida': bebida,
                 'valor_total': round(valor, 2),
                 'forma_pagamento': forma_pgto,
@@ -199,7 +211,17 @@ def gerar_vendas(inicio='2023-06-30', fim='2025-06-30'):
             })
 
     df = pd.DataFrame(registros)
+
+    # === Estatística de bebidas ===
+    total_refil = (df['tipo_bebida'] == 'Refil').sum()
+    total_refrigerante = df['tipo_bebida'].isin(['Lata', '2L']).sum()
+
+    print(f"\nTotal que escolheram REFRIL: {total_refil}")
+    print(f"Total que escolheram REFRIGERANTE (Lata/2L): {total_refrigerante}")
+    print(f"Total geral de vendas: {len(df)}")
+
     return df
+
 
 # === GERAR DADOS E SALVAR ===
 df = gerar_vendas()

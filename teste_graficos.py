@@ -9,6 +9,42 @@ from tkinter import Tk, filedialog
 st.set_page_config(page_title="Dashboard Restaurante", layout="wide")
 sns.set(style="whitegrid", palette="muted")
 
+# ===================== ESTILO DE FUNDO =====================
+st.markdown("""
+    <style>
+        .stApp {
+            background-color: #3B0002;
+        }
+        div[data-testid="stVerticalBlock"] {
+            background-color: #3B0002 !important;
+        }
+        h1, h2, h3, h4, h5, h6, p, span, label, div, input, select, textarea {
+            color: white !important;
+        }
+        [data-testid="stMetricValue"], [data-testid="stMetricLabel"] {
+            color: white !important;
+        }
+        div[data-baseweb="select"] > div {
+            background-color: #4B0003 !important;
+            color: white !important;
+        }
+        [data-testid="stMetricDelta"] {
+            color: #FFB6B6 !important;
+        }
+        hr {
+            border-color: #770006 !important;
+        }
+        button {
+            background-color: #5C0002 !important;
+            color: white !important;
+            border-radius: 6px;
+        }
+        button:hover {
+            background-color: #7A0003 !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
 # ===================== LISTA DE MESES =====================
 meses_oficiais = [
     "janeiro", "fevereiro", "março", "abril", "maio", "junho",
@@ -19,27 +55,55 @@ meses_oficiais = [
 @st.cache_data
 def carregar_dados():
     try:
-        root = Tk()
-        root.withdraw()
-        caminho_arquivo = filedialog.askopenfilename(
-            title="Selecione o arquivo de vendas (CSV ou Excel)",
-            filetypes=[("Arquivos CSV", "*.csv"), ("Arquivos Excel", "*.xlsx *.xls")]
-        )
-        root.destroy()
+        caminho_padrao = "vendas_restaurante_2023_2025.csv"
 
-        if not caminho_arquivo:
-            st.error("❌ Nenhum arquivo selecionado. Por favor, selecione um arquivo CSV ou Excel.")
-            st.stop()
+        # tenta ler o arquivo padrão
+        try:
+            if caminho_padrao.endswith(".csv"):
+                df = pd.read_csv(caminho_padrao, parse_dates=["data"])
+            else:
+                df = pd.read_excel(caminho_padrao, parse_dates=["data"])
+            caminho_arquivo_usado = caminho_padrao
+        except FileNotFoundError:
+            # fallback: abrir diálogo tkinter para selecionar arquivo manualmente
+            root = Tk()
+            root.withdraw()
+            caminho_arquivo = filedialog.askopenfilename(
+                title="Selecione o arquivo de vendas (CSV ou Excel)",
+                filetypes=[("Arquivos CSV", "*.csv"), ("Arquivos Excel", "*.xlsx *.xls")]
+            )
+            root.destroy()
 
-        if caminho_arquivo.endswith(".csv"):
-            df = pd.read_csv(caminho_arquivo, parse_dates=["data"])
-        else:
-            df = pd.read_excel(caminho_arquivo, parse_dates=["data"])
+            if not caminho_arquivo:
+                st.error("❌ Nenhum arquivo selecionado. Por favor, selecione um arquivo CSV ou Excel.")
+                st.stop()
 
+            if caminho_arquivo.endswith(".csv"):
+                df = pd.read_csv(caminho_arquivo, parse_dates=["data"])
+            else:
+                df = pd.read_excel(caminho_arquivo, parse_dates=["data"])
+            caminho_arquivo_usado = caminho_arquivo
+
+        # cria colunas derivadas
         df["ano"] = df["data"].dt.year
         df["mes"] = df["data"].dt.month.apply(lambda x: meses_oficiais[x - 1])
         df["hora"] = df["data"].dt.hour
         df["periodo"] = df["hora"].apply(lambda h: "Dia" if 6 <= h < 18 else "Noite")
+
+        # Verificação de colunas importantes
+        colunas_esperadas = ["tipo_bebida", "valor_total", "avaliacao", "cancelado"]
+        faltando = [c for c in colunas_esperadas if c not in df.columns]
+        if faltando:
+            st.warning(f"⚠️ O arquivo '{caminho_arquivo_usado}' não contém as colunas: {faltando}. Algumas métricas/gráficos podem ficar indisponíveis.")
+            # cria colunas faltantes com valor padrão quando possível para evitar KeyError
+            if "tipo_bebida" not in df.columns:
+                df["tipo_bebida"] = "Indefinido"
+            if "valor_total" not in df.columns:
+                df["valor_total"] = 0.0
+            if "avaliacao" not in df.columns:
+                df["avaliacao"] = df.get("avaliacao", pd.Series([None] * len(df)))
+            if "cancelado" not in df.columns:
+                df["cancelado"] = False
 
         return df
 
@@ -47,10 +111,14 @@ def carregar_dados():
         st.error(f"⚠️ Erro ao carregar os dados: {e}")
         st.stop()
 
-
 df = carregar_dados()
 
-st.image("tia_graca.jpg", width=600)
+# ===================== LOGO =====================
+try:
+    st.image("tia_graca.jpg", width=600)
+except Exception:
+    # se a imagem não existir, ignora (não quebra o app)
+    pass
 
 # ===================== TÍTULO =====================
 st.title("📊 Dashboard de Vendas — Restaurante & Pizzaria")
@@ -79,7 +147,6 @@ with col3:
     periodo_filtro = st.selectbox("Selecione o período:", options=["Todos", "Dia", "Noite"])
 
 df_filtrado = df_ano.copy()
-
 if mes_filtro != "Todos":
     df_filtrado = df_filtrado[df_filtrado["mes"] == mes_filtro]
 if periodo_filtro != "Todos":
@@ -90,7 +157,7 @@ col1, col2, col3, col4 = st.columns(4)
 col1.metric("💰 Faturamento Total", f"R$ {df_filtrado['valor_total'].sum():,.2f}")
 col2.metric("🧾 Nº de Vendas", f"{len(df_filtrado):,}")
 col3.metric("⭐ Avaliação Média", f"{df_filtrado['avaliacao'].mean():.2f}")
-col4.metric("❌ Pedidos Cancelados", f"{df_filtrado['cancelado'].sum()}")
+col4.metric("❌ Pedidos Cancelados", f"{int(df_filtrado['cancelado'].sum())}")
 
 # ===================== SELECTBOX DE GRÁFICOS =====================
 st.markdown("---")
@@ -102,6 +169,7 @@ opcoes_graficos = [
     "Distribuição de Avaliações",
     "Análise de Pizzas",
     "🍹 Bebidas Mais Escolhidas",
+    "🥤 Comparativo: Refil vs Refrigerante",
     "🍰 Sobremesas Mais Escolhidas",
     "Horário de Pico",
     "Faturamento por Mês",
@@ -115,38 +183,40 @@ grafico = st.selectbox("Selecionar gráfico:", options=opcoes_graficos)
 
 def plot_genero(df_):
     fig, ax = plt.subplots(figsize=(5, 4))
-    sns.countplot(data=df_, x="sexo", palette="pastel", ax=ax)
+    sns.countplot(data=df_, x="sexo", hue="sexo", palette="pastel", ax=ax, dodge=False, legend=False)
     ax.set_title("Distribuição de Clientes por Gênero")
     ax.set_xlabel("Gênero")
     ax.set_ylabel("Quantidade")
     st.pyplot(fig)
 
-
 def plot_formas_pagamento(df_):
+    if "forma_pagamento" not in df_.columns:
+        st.info("Dados de forma de pagamento não disponíveis.")
+        return
     formas_pgto = df_["forma_pagamento"].value_counts(normalize=True) * 100
     fig, ax = plt.subplots(figsize=(5, 5))
     ax.pie(formas_pgto, labels=formas_pgto.index, autopct='%1.1f%%', startangle=90, colors=sns.color_palette("Set3"))
     ax.set_title("💳 Porcentagem das Formas de Pagamento")
     st.pyplot(fig)
 
-
 def plot_avaliacoes(df_):
+    if "avaliacao" not in df_.columns:
+        st.info("Dados de avaliação não disponíveis.")
+        return
     fig, ax = plt.subplots(figsize=(6, 4))
-    sns.countplot(data=df_, x="avaliacao", palette="mako", ax=ax, order=sorted(df_['avaliacao'].unique()))
+    sns.countplot(data=df_, x="avaliacao", palette="mako", ax=ax, order=sorted(df_['avaliacao'].dropna().unique()))
     ax.set_title("⭐ Distribuição das Avaliações")
     ax.set_xlabel("Nota de Avaliação (1 a 5)")
     ax.set_ylabel("Quantidade")
     st.pyplot(fig)
 
-
 def plot_pizzas(df_):
-    # Filtra apenas as linhas onde o cardápio tem 'pizza'
+    if "tipo_cardapio" not in df_.columns or "prato" not in df_.columns:
+        st.info("Dados de pizzas não disponíveis.")
+        return
     pizzas = df_[df_["tipo_cardapio"].str.contains("pizza", case=False, na=False)]
-    
     if len(pizzas) > 0:
-        # O sabor da pizza está na coluna 'prato'
         pizza_counts = pizzas["prato"].value_counts().head(5)
-        
         col1, col2 = st.columns(2)
         with col1:
             fig, ax = plt.subplots(figsize=(6, 4))
@@ -155,25 +225,19 @@ def plot_pizzas(df_):
             ax.set_xlabel("Quantidade")
             ax.set_ylabel("Sabores")
             st.pyplot(fig)
-        
         with col2:
             pizza_percent = (pizza_counts / pizza_counts.sum()) * 100
             fig, ax = plt.subplots(figsize=(5, 5))
-            ax.pie(
-                pizza_percent,
-                labels=pizza_percent.index,
-                autopct='%1.1f%%',
-                startangle=90,
-                colors=sns.color_palette("pastel")
-            )
+            ax.pie(pizza_percent, labels=pizza_percent.index, autopct='%1.1f%%', startangle=90, colors=sns.color_palette("pastel"))
             ax.set_title("Porcentagem de Vendas por Sabor (Top 5)")
             st.pyplot(fig)
     else:
         st.info("Nenhuma venda de pizza para o filtro selecionado.")
 
-
-
 def plot_bebidas(df_):
+    if "bebida" not in df_.columns:
+        st.info("Dados de bebida não disponíveis.")
+        return
     bebidas = df_["bebida"].value_counts().head(5)
     col1, col2 = st.columns(2)
     with col1:
@@ -190,9 +254,46 @@ def plot_bebidas(df_):
         ax.set_title("Porcentagem das Bebidas (Top 5)")
         st.pyplot(fig)
 
+def plot_refil_vs_refrigerante(df_):
+    if "tipo_bebida" not in df_.columns:
+        st.error("⚠️ O arquivo não contém a coluna 'tipo_bebida'. Gere novamente os dados com o script atualizado.")
+        return
+
+    total_refil = (df_["tipo_bebida"] == "Refil").sum()
+    total_refrigerante = df_["tipo_bebida"].isin(["Lata", "2L"]).sum()
+
+    dados = pd.DataFrame({
+        "Tipo": ["Refil", "Refrigerante (Lata/2L)"],
+        "Quantidade": [total_refil, total_refrigerante]
+    })
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        fig, ax = plt.subplots(figsize=(6, 4))
+        sns.barplot(x="Tipo", y="Quantidade", data=dados, palette=["#6A1B9A", "#00897B", "#616161"], ax=ax)
+        ax.set_title("🥤 Comparativo: Refil vs Refrigerante")
+        ax.set_xlabel("Categoria de Bebida")
+        ax.set_ylabel("Quantidade de Vendas")
+        for i, v in enumerate(dados["Quantidade"]):
+            ax.text(i, v + max(1, v * 0.01), str(v), ha='center', va='bottom', color='white', fontweight='bold')
+        st.pyplot(fig)
+
+    with col2:
+        fig, ax = plt.subplots(figsize=(5, 5))
+        ax.pie(dados["Quantidade"], labels=dados["Tipo"], autopct='%1.1f%%', startangle=90,
+               colors=["#BA68C8", "#4DB6AC", "#9E9E9E"])
+        ax.set_title("Proporção de Escolhas de Bebida")
+        st.pyplot(fig)
 
 def plot_sobremesas(df_):
+    if "sobremesa" not in df_.columns:
+        st.info("Dados de sobremesa não disponíveis.")
+        return
     doces = df_[df_["sobremesa"] != "Nenhuma"]["sobremesa"].value_counts().head(5)
+    if len(doces) == 0:
+        st.info("Nenhuma sobremesa registrada para o filtro selecionado.")
+        return
     col1, col2 = st.columns(2)
     with col1:
         fig, ax = plt.subplots(figsize=(6, 4))
@@ -208,16 +309,18 @@ def plot_sobremesas(df_):
         ax.set_title("Porcentagem das Sobremesas (Top 5)")
         st.pyplot(fig)
 
-
 def plot_horario_pico(df_):
     vendas_por_hora = df_.groupby("hora")["valor_total"].count().reset_index()
     vendas_por_hora.rename(columns={"valor_total": "qtd_vendas"}, inplace=True)
+    if vendas_por_hora["qtd_vendas"].sum() == 0:
+        st.info("Sem vendas registradas para o filtro selecionado.")
+        return
     fig, ax = plt.subplots(figsize=(10, 5))
-    sns.lineplot(data=vendas_por_hora, x="hora", y="qtd_vendas", color="#2E86C1", linewidth=3, marker="o", ax=ax)
+    sns.lineplot(data=vendas_por_hora, x="hora", y="qtd_vendas", linewidth=3, marker="o", ax=ax)
     ax.set_title("⏰ Horários com Mais Vendas", fontsize=14, weight="bold")
     ax.set_xlabel("Hora do Dia", fontsize=12)
     ax.set_ylabel("Quantidade de Vendas", fontsize=12)
-    ax.set_xticks(range(11, 24))
+    ax.set_xticks(range(0, 24))
     ax.grid(True, linestyle="--", alpha=0.4)
     hora_pico = vendas_por_hora.loc[vendas_por_hora["qtd_vendas"].idxmax()]
     ax.axvline(hora_pico["hora"], color="red", linestyle="--", alpha=0.7)
@@ -225,18 +328,17 @@ def plot_horario_pico(df_):
             color="red", ha="center", fontsize=10, weight="bold")
     st.pyplot(fig)
 
-
 def plot_faturamento_mes(df_):
     vendas_mes = df_.groupby("mes")["valor_total"].sum()
-    vendas_mes = vendas_mes.reindex(meses_oficiais).dropna()
+    # reindex usando meses_oficiais para garantir ordem correta
+    vendas_mes = vendas_mes.reindex(meses_oficiais).fillna(0)
     fig, ax = plt.subplots(figsize=(10, 5))
-    sns.barplot(x=vendas_mes.index.str.capitalize(), y=vendas_mes.values, palette="flare", ax=ax)
+    sns.barplot(x=[m.capitalize() for m in vendas_mes.index], y=vendas_mes.values, palette="flare", ax=ax)
     ax.set_title("📅 Faturamento Total por Mês")
     ax.set_xlabel("Mês")
     ax.set_ylabel("Faturamento (R$)")
     plt.xticks(rotation=45, ha="right")
     st.pyplot(fig)
-
 
 def plot_rendimento_ano(df_):
     vendas_ano = df_.groupby("ano")["valor_total"].sum()
@@ -248,9 +350,8 @@ def plot_rendimento_ano(df_):
     import matplotlib.ticker as mticker
     ax.yaxis.set_major_formatter(mticker.StrMethodFormatter('R$ {x:,.0f}'))
     for i, v in enumerate(vendas_ano.values):
-        ax.text(i, v + (v * 0.01), f"R$ {v:,.0f}", ha='center', va='bottom', fontsize=10, fontweight='bold')
+        ax.text(i, v + max(1, v * 0.01), f"R$ {v:,.0f}", ha='center', va='bottom', fontsize=10, fontweight='bold')
     st.pyplot(fig)
-
 
 def plot_wordcloud():
     palavras = """
@@ -269,6 +370,8 @@ def plot_wordcloud():
 # ===================== MOSTRAR O GRÁFICO SELECIONADO =====================
 if grafico == "Distribuição por Gênero":
     plot_genero(df_filtrado)
+elif grafico == "🥤 Comparativo: Refil vs Refrigerante":
+    plot_refil_vs_refrigerante(df_filtrado)
 elif grafico == "Formas de Pagamento":
     plot_formas_pagamento(df_filtrado)
 elif grafico == "Distribuição de Avaliações":
